@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Lexend", ui-sans-serif, system-ui, sans-serif;
+  --color-mist: #b9cbd1;
+  --color-navy: #26354f;
+  --color-slate-card: #8e9db5;
+  --color-panel: #eceef2;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-mist font-sans text-navy antialiased;
+}
