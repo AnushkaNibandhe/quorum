@@ -15,7 +15,8 @@ Return ONLY a JSON object with exactly this shape:
   "decisions": [{"decision": str, "evidence": str, "confidence": 0-1}],
   "action_items": [{"id": "A1", "task": str, "owner": str|null, "due_text": str|null,
                     "due_date": "YYYY-MM-DD"|null, "priority": "HIGH"|"MEDIUM"|"LOW",
-                    "depends_on": ["A2"], "evidence": str, "confidence": 0-1}],
+                    "depends_on": ["A2"], "dependency_type": "BLOCKING",
+                    "evidence": str, "confidence": 0-1}],
   "risks": [{"risk": str, "severity": "HIGH"|"MEDIUM"|"LOW", "mitigation": str|null,
              "evidence": str, "confidence": 0-1}]
 }
@@ -23,8 +24,13 @@ Rules:
 - "evidence" MUST be copied verbatim from the notes (the exact sentence or fragment). Never paraphrase it.
 - Only include items actually present in the notes. Do not invent owners or dates: use null when absent.
 - "due_text" is the date phrase as written (e.g. "by Friday"); resolve "due_date" relative to the meeting date given.
-- "depends_on" lists ids of other action items that must finish first. Words like "once", "after",
-  "when X is done", "blocked on", "depends on" signal a dependency: always fill it in when present.
+- "depends_on" lists IDs of other action items that must finish first.
+  * Only list a dependency when the notes contain an EXPLICIT or STRONGLY IMPLIED ordering.
+  * Words like "once", "after", "when X is done", "blocked on", "depends on", "following", "upon completion of" signal a dependency.
+  * An unrelated task that happens to be owned by the same person is NOT a dependency.
+  * Do NOT hallucinate dependencies. If uncertain, use [].
+  * All IDs in depends_on MUST appear as action item IDs in this same response.
+- "dependency_type" is always "BLOCKING" for now; omit the field or set it to "BLOCKING".
 - "confidence" is how clearly the notes state the item (1 = explicit, 0.5 = implied)."""
 
 WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]

@@ -4,7 +4,6 @@ import Icon from './Icon'
 
 const SAMPLE = {
   title: 'Project Alpha sync',
-  project: 'Project Alpha',
   team: 'Engineering',
   text: `Meeting: Project Alpha weekly sync
 Attendees: Rahul, Priya, Amit, Neha
@@ -29,17 +28,28 @@ const BUSY = { pdf: 'Reading PDF...', image: 'Reading handwriting...', audio: 'T
 
 const field = 'w-full rounded-xl bg-panel px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-card'
 
-export default function Analyze({ meetings, onResult }) {
+/**
+ * Props
+ *   project     – the currently active project object { id, name, ... }
+ *   onResult    – called with the saved meeting after a successful analysis
+ *   onBack      – called when the user wants to go back to the project workspace
+ */
+export default function Analyze({ project, onResult, onBack }) {
   const [tab, setTab] = useState('text')
-  const [form, setForm] = useState(() => ({ title: '', project: '', team: '', meeting_date: new Date().toLocaleDateString('en-CA'), text: '', input_type: 'text' }))
+  const [form, setForm] = useState(() => ({
+    title: '',
+    team: '',
+    meeting_date: new Date().toLocaleDateString('en-CA'),
+    text: '',
+    input_type: 'text',
+  }))
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
-  const [source, setSource] = useState('') // name of the file the text came from
+  const [source, setSource] = useState('')
   const [translate, setTranslate] = useState(true)
   const [recording, setRecording] = useState(false)
   const recorder = useRef(null)
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value })
-  const unique = (key) => [...new Set(meetings.map((m) => m[key]))]
 
   const upload = async (file) => {
     if (!file) return
@@ -85,12 +95,14 @@ export default function Analyze({ meetings, onResult }) {
     setBusy('Extracting decisions, actions and risks...')
     setError('')
     try {
-      onResult(await analyze({
+      const result = await analyze({
         ...form,
         title: form.title || 'Untitled meeting',
-        project: form.project || 'General',
         team: form.team || 'General',
-      }))
+        // project_id comes from the active project — user never types it
+        project_id: project.id,
+      })
+      onResult(result)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -101,90 +113,142 @@ export default function Analyze({ meetings, onResult }) {
   const current = TABS.find((t) => t.id === tab)
 
   return (
-    <section id="analyze" className="scroll-mt-6 px-2 sm:px-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h2 className="text-xl font-medium">Analyze a meeting</h2>
-        <button type="button" onClick={() => { setTab('text'); setSource(''); setForm({ ...form, ...SAMPLE, input_type: 'text' }) }} className="text-sm underline underline-offset-4 hover:text-slate-card">
-          Load sample notes
-        </button>
-      </div>
-
-      <div role="tablist" className="mt-6 flex flex-wrap gap-2">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => { setTab(t.id); setError('') }}
-            className={`rounded-full px-4 py-2 text-sm ${tab === t.id ? 'bg-navy text-white' : 'bg-panel hover:bg-slate-card/30'}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      <form onSubmit={submit} className="mt-4 grid gap-4">
-        {tab !== 'text' && (
-          <div className="flex flex-wrap items-center gap-4 rounded-2xl border-2 border-dashed border-slate-card/50 p-5">
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-navy px-5 py-2.5 text-sm font-medium text-white hover:bg-navy/90">
-              <Icon name="upload" className="size-4" /> Choose file
-              <input type="file" accept={current.accept} className="sr-only" disabled={!!busy} onChange={(e) => { upload(e.target.files[0]); e.target.value = '' }} />
-            </label>
-            {tab === 'audio' && (
-              <button
-                type="button"
-                onClick={toggleRecording}
-                disabled={!!busy && !recording}
-                className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium ${recording ? 'bg-rose-600 text-white' : 'bg-panel hover:bg-slate-card/30'}`}
-              >
-                {recording ? <span className="size-2.5 animate-pulse rounded-full bg-white" /> : <Icon name="mic" className="size-4" />}
-                {recording ? 'Stop recording' : 'Record now'}
-              </button>
-            )}
-            <span className="text-xs font-light">{current.hint}</span>
-            {tab === 'audio' && (
-              <label className="flex w-full items-center gap-2 text-xs">
-                <input type="checkbox" checked={translate} onChange={(e) => setTranslate(e.target.checked)} className="accent-navy" />
-                Translate to English (for Hindi and other Indian languages)
-              </label>
-            )}
+    <div className="px-4 py-6 sm:px-8 sm:py-10">
+      <div className="mx-auto max-w-6xl rounded-sm bg-white px-4 pb-12 shadow-sm sm:px-6">
+        {/* Nav */}
+        <nav className="flex flex-wrap items-center gap-4 py-4">
+          <span className="text-2xl font-extrabold tracking-tight">
+            quorum<span className="text-slate-card">.</span>
+          </span>
+          <div className="ml-4 flex items-center gap-2 text-sm text-navy/60">
+            <button onClick={onBack} className="hover:text-navy">
+              {project.name}
+            </button>
+            <span>/</span>
+            <span className="font-medium text-navy">Analyze meeting</span>
           </div>
-        )}
+        </nav>
 
-        {source && (
-          <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Text extracted from <strong className="font-medium">{source}</strong>. OCR and transcription can make mistakes, so check and fix the text below before analyzing.
-          </p>
-        )}
-
-        <div className="grid gap-4 sm:grid-cols-4">
-          <input className={field} placeholder="Meeting title" value={form.title} onChange={set('title')} />
-          <input className={field} placeholder="Project" list="projects" value={form.project} onChange={set('project')} />
-          <input className={field} placeholder="Team" list="teams" value={form.team} onChange={set('team')} />
-          <input className={field} type="date" aria-label="Meeting date" value={form.meeting_date} onChange={set('meeting_date')} />
-          <datalist id="projects">{unique('project').map((p) => <option key={p} value={p} />)}</datalist>
-          <datalist id="teams">{unique('team').map((t) => <option key={t} value={t} />)}</datalist>
-        </div>
-
-        {(tab === 'text' || form.text) && (
-          <textarea
-            className={`${field} min-h-56 resize-y font-light`}
-            placeholder="Paste your meeting notes, transcript or minutes here..."
-            value={form.text}
-            onChange={(e) => setForm({ ...form, text: e.target.value, input_type: source ? form.input_type : 'text' })}
-            required
-            minLength={10}
-          />
-        )}
-
-        <div className="flex flex-wrap items-center gap-4">
-          <button disabled={!!busy || form.text.trim().length < 10} className="rounded-full bg-navy px-6 py-2.5 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50">
-            Analyze meeting
+        {/* Active project badge */}
+        <div className="mb-6 flex items-center gap-3 rounded-2xl bg-panel px-5 py-3">
+          <span className="grid size-8 place-items-center rounded-full bg-navy text-white">
+            <Icon name="layers" className="size-4" />
+          </span>
+          <div>
+            <p className="text-xs font-light text-navy/60">Saving to project</p>
+            <p className="text-sm font-semibold">{project.name}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onBack}
+            className="ml-auto text-xs underline underline-offset-4 hover:text-slate-card"
+          >
+            Change project
           </button>
-          {busy && <span role="status" className="text-sm font-light">{busy}</span>}
         </div>
-        {error && <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</p>}
-      </form>
-    </section>
+
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <h2 className="text-xl font-medium">Analyze a meeting</h2>
+          <button
+            type="button"
+            onClick={() => {
+              setTab('text')
+              setSource('')
+              setForm({ ...form, ...SAMPLE, input_type: 'text' })
+            }}
+            className="text-sm underline underline-offset-4 hover:text-slate-card"
+          >
+            Load sample notes
+          </button>
+        </div>
+
+        <div role="tablist" className="mt-6 flex flex-wrap gap-2">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => { setTab(t.id); setError('') }}
+              className={`rounded-full px-4 py-2 text-sm ${tab === t.id ? 'bg-navy text-white' : 'bg-panel hover:bg-slate-card/30'}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <form onSubmit={submit} className="mt-4 grid gap-4">
+          {tab !== 'text' && (
+            <div className="flex flex-wrap items-center gap-4 rounded-2xl border-2 border-dashed border-slate-card/50 p-5">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-navy px-5 py-2.5 text-sm font-medium text-white hover:bg-navy/90">
+                <Icon name="upload" className="size-4" /> Choose file
+                <input
+                  type="file"
+                  accept={current.accept}
+                  className="sr-only"
+                  disabled={!!busy}
+                  onChange={(e) => { upload(e.target.files[0]); e.target.value = '' }}
+                />
+              </label>
+              {tab === 'audio' && (
+                <button
+                  type="button"
+                  onClick={toggleRecording}
+                  disabled={!!busy && !recording}
+                  className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium ${recording ? 'bg-rose-600 text-white' : 'bg-panel hover:bg-slate-card/30'}`}
+                >
+                  {recording ? <span className="size-2.5 animate-pulse rounded-full bg-white" /> : <Icon name="mic" className="size-4" />}
+                  {recording ? 'Stop recording' : 'Record now'}
+                </button>
+              )}
+              <span className="text-xs font-light">{current.hint}</span>
+              {tab === 'audio' && (
+                <label className="flex w-full items-center gap-2 text-xs">
+                  <input type="checkbox" checked={translate} onChange={(e) => setTranslate(e.target.checked)} className="accent-navy" />
+                  Translate to English (for Hindi and other Indian languages)
+                </label>
+              )}
+            </div>
+          )}
+
+          {source && (
+            <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              Text extracted from <strong className="font-medium">{source}</strong>. OCR and transcription can make mistakes — check the text below before analyzing.
+            </p>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <input className={field} placeholder="Meeting title" value={form.title} onChange={set('title')} />
+            <input className={field} placeholder="Team (optional)" value={form.team} onChange={set('team')} />
+            <input className={field} type="date" aria-label="Meeting date" value={form.meeting_date} onChange={set('meeting_date')} />
+          </div>
+
+          {(tab === 'text' || form.text) && (
+            <textarea
+              className={`${field} min-h-56 resize-y font-light`}
+              placeholder="Paste your meeting notes, transcript or minutes here..."
+              value={form.text}
+              onChange={(e) => setForm({ ...form, text: e.target.value, input_type: source ? form.input_type : 'text' })}
+              required
+              minLength={10}
+            />
+          )}
+
+          <div className="flex flex-wrap items-center gap-4">
+            <button
+              disabled={!!busy || form.text.trim().length < 10}
+              className="rounded-full bg-navy px-6 py-2.5 text-sm font-medium text-white hover:bg-navy/90 disabled:opacity-50"
+            >
+              Analyze meeting
+            </button>
+            {busy && <span role="status" className="text-sm font-light">{busy}</span>}
+          </div>
+          {error && (
+            <p role="alert" className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-800">
+              {error}
+            </p>
+          )}
+        </form>
+      </div>
+    </div>
   )
 }
